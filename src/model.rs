@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-pub const TOOLS: [&str; 5] = ["codex", "claude", "grok", "pi", "omp"];
+pub const TOOLS: [&str; 7] = ["codex", "claude", "grok", "pi", "omp", "dsh", "antigravity"];
 
 pub fn tool_label(id: &str) -> &'static str {
     match id {
@@ -10,6 +10,8 @@ pub fn tool_label(id: &str) -> &'static str {
         "grok" => "Grok Build",
         "pi" => "Pi",
         "omp" => "OMP",
+        "dsh" => "DSH",
+        "antigravity" => "Antigravity",
         _ => "unknown",
     }
 }

@@ -66,6 +66,8 @@ pub struct HarnessToggles {
     pub grok: Option<HarnessOverride>,
     pub pi: Option<HarnessOverride>,
     pub omp: Option<HarnessOverride>,
+    pub dsh: Option<HarnessOverride>,
+    pub antigravity: Option<HarnessOverride>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -148,6 +150,8 @@ impl Config {
             "grok" => self.harnesses.grok.as_ref(),
             "pi" => self.harnesses.pi.as_ref(),
             "omp" => self.harnesses.omp.as_ref(),
+            "dsh" => self.harnesses.dsh.as_ref(),
+            "antigravity" => self.harnesses.antigravity.as_ref(),
             _ => None,
         };
         ov.map(|o| o.enabled).unwrap_or(true)
@@ -160,6 +164,8 @@ impl Config {
             "grok" => self.harnesses.grok.as_ref(),
             "pi" => self.harnesses.pi.as_ref(),
             "omp" => self.harnesses.omp.as_ref(),
+            "dsh" => self.harnesses.dsh.as_ref(),
+            "antigravity" => self.harnesses.antigravity.as_ref(),
             _ => None,
         };
         ov.and_then(|o| o.data_dir.clone())

@@ -38,7 +38,7 @@ _Universal plugin · Scan locally · Write with Grok / Claude / Codex · Marketp
 
 ## 🤔 Why harness-daily?
 
-If you work with multiple AI coding agents — Codex, Claude Code, Grok Build, Pi, OMP — your day is
+If you work with multiple AI coding agents — Codex, Claude Code, Grok Build, Pi, OMP, DSH, or Antigravity — your day is
 scattered across dozens of sessions in half a dozen projects. Writing a daily standup report means
 digging through histories by hand.
 
@@ -57,7 +57,7 @@ harness-daily does it for you:
 
 ```text
 08:00 (OS task) → harness-daily report
-   ├─ discover roots  (codex / claude / grok / pi / omp, incl. desktop apps sharing those dirs)
+   ├─ discover roots  (codex / claude / grok / pi / omp / dsh / antigravity)
    ├─ collect         (parse JSONL, dedupe, drop "continue"/"ok"/smoke-test noise)
    ├─ write            grok --prompt-file / claude -p / codex exec  (your login, your default model)
    └─ render          D:/Me/工作日志/日报-YYYY-MM-DD.md   ← summary · details · issues · stats · audit log
@@ -73,8 +73,8 @@ harness-daily does it for you:
 | OS scheduler | Windows `schtasks` / macOS `launchd` / Linux cron — fires `report --auto --backfill 7` daily |
 
 Supported out of the box: **Codex CLI** (`~/.codex`), **Claude Code** (`~/.claude`), **Grok Build**
-(`~/.grok`), **Pi** (`~/.pi`), **OMP** (`~/.omp`). Desktop apps that share those directories are
-covered automatically. Moved a data dir? Point `[harnesses.<id>].data_dir` at the new location.
+(`~/.grok`), **Pi** (`~/.pi`), **OMP** (`~/.omp`), **DSH** (`~/.dsh`), and **Antigravity**
+(`~/.gemini/antigravity`, with CLI-store fallback at `~/.gemini/antigravity-cli`). Moved a data dir? Point `[harnesses.<id>].data_dir` at the new location.
 
 ## ✅ Requirements
 
@@ -201,6 +201,14 @@ include_stats     = true
 [harnesses.codex]
 enabled  = true
 data_dir = ""               # override if you moved ~/.codex
+
+[harnesses.dsh]
+enabled  = true
+data_dir = ""               # override if you moved ~/.dsh
+
+[harnesses.antigravity]
+enabled  = true
+data_dir = ""               # override if you moved ~/.gemini/antigravity
 ```
 
 ## 📄 Report format
@@ -219,7 +227,7 @@ data_dir = ""               # override if you moved ~/.codex
 - **New harness / desktop app**: copy [`adapters/example-jsonl.toml`](adapters/example-jsonl.toml)
   into your config dir and edit the paths/keys. Built-in Rust adapters live in `src/collect.rs`;
   PRs welcome (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-- **Writer CLI**: `--host grok|claude|codex|auto`. Collection always covers all five harnesses.
+- **Writer CLI**: `--host grok|claude|codex|auto`. Collection covers all seven built-in sources.
 - **Privacy**: everything is local. Only the per-project prompt digest is passed to your own
   writer CLI (`grok --prompt-file` / `claude -p` / `codex exec`); the audit appendix can be disabled.
 

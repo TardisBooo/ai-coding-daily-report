@@ -17,8 +17,9 @@ Thanks for your interest in improving harness-daily!
    - Accept `(root, day_start, day_end)` and return `Vec<Activity>`.
    - Parse defensively: skip malformed lines, never panic on unexpected shapes.
    - Normalize timestamps to UTC; dedupe re-sent prompts within a 2-minute window.
+   - Keep source-specific envelopes at the adapter boundary. For compressed or database-backed formats, use a portable Rust dependency and fail back to an unresolved project instead of aborting the whole report.
 3. Add a detection entry in `src/discovery.rs` (default paths + fingerprint).
-4. Add fixtures under `tests/fixtures/<id>/` — **synthetic data only**, never real session logs.
+4. Add synthetic fixtures or inline tests for raw and compressed records — **never real session logs**.
 5. Update the support table in both READMEs.
 
 Run the full gate before opening a PR:

@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Built-in DSH and Antigravity session collectors.
+- DSH zstd JSONL discovery and Antigravity transcript workspace mapping.
+
 ### Changed
 
 - Documented as a **universal plugin** for Grok Build, Claude Code, and Codex (same repo,

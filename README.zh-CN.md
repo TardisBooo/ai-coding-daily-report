@@ -38,7 +38,7 @@ _通用插件 · 本地扫描 · Grok / Claude / Codex 写正文 · Marketplace 
 
 ## 🤔 为什么需要 harness-daily？
 
-同时用多个 AI 编码工具（Codex、Claude Code、Grok Build、Pi、OMP）的人，一天的工作散落在
+同时用多个 AI 编码工具（Codex、Claude Code、Grok Build、Pi、OMP、DSH、Antigravity）的人，一天的工作散落在
 几十个会话、若干个项目里。写日报 = 手工翻历史。
 
 harness-daily 替你做：
@@ -52,7 +52,7 @@ harness-daily 替你做：
 
 ```text
 08:00（系统任务）→ harness-daily report
-   ├─ 发现数据目录   （codex / claude / grok / pi / omp，含共用这些目录的桌面端）
+   ├─ 发现数据目录   （codex / claude / grok / pi / omp / dsh / antigravity）
    ├─ 采集           （解析 JSONL、去重、剔除「继续/ok/连通性测试」）
    ├─ 写正文         grok --prompt-file / claude -p / codex exec（你的登录态与默认模型）
    └─ 渲染           D:/Me/工作日志/日报-YYYY-MM-DD.md   ← 总结 · 明细 · 问题 · 统计 · 审计
@@ -68,8 +68,8 @@ harness-daily 替你做：
 | 系统调度器 | Windows `schtasks` / macOS `launchd` / Linux cron，每天触发 `report --auto --backfill 7` |
 
 内置支持：**Codex CLI**（`~/.codex`）、**Claude Code**（`~/.claude`）、**Grok Build**
-（`~/.grok`）、**Pi**（`~/.pi`）、**OMP**（`~/.omp`）。与这些目录共用的桌面端自动覆盖；
-数据目录搬家了，把 `[harnesses.<id>].data_dir` 指过去即可。
+（`~/.grok`）、**Pi**（`~/.pi`）、**OMP**（`~/.omp`）、**DSH**（`~/.dsh`）和
+**Antigravity**（`~/.gemini/antigravity`，CLI 数据目录回退到 `~/.gemini/antigravity-cli`）。数据目录搬家了，把 `[harnesses.<id>].data_dir` 指过去即可。
 
 ## ✅ 环境要求
 
@@ -190,6 +190,14 @@ include_stats     = true
 [harnesses.codex]
 enabled  = true
 data_dir = ""               # ~/.codex 搬家后在此覆盖
+
+[harnesses.dsh]
+enabled  = true
+data_dir = ""               # ~/.dsh 搬家后在此覆盖
+
+[harnesses.antigravity]
+enabled  = true
+data_dir = ""               # ~/.gemini/antigravity 搬家后在此覆盖
 ```
 
 ## 📄 日报格式
@@ -208,7 +216,7 @@ data_dir = ""               # ~/.codex 搬家后在此覆盖
 - **新增 harness / 桌面端**：复制 [`adapters/example-jsonl.toml`](adapters/example-jsonl.toml)
   到配置目录改路径/字段；内置 Rust 适配器在 `src/collect.rs`，欢迎 PR（见
   [`CONTRIBUTING.md`](CONTRIBUTING.md)）。
-- **写正文 CLI**：`--host grok|claude|codex|auto`。采集始终覆盖全部五家 harness。
+- **写正文 CLI**：`--host grok|claude|codex|auto`。采集覆盖内置七类来源。
 - **隐私**：全部本地。只有「项目级提问摘要」会传给你自己的写正文 CLI（`grok --prompt-file` / `claude -p` / `codex exec`）；审计附录可关闭。
 
 ## 🛠 开发

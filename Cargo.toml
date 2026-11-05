@@ -2,7 +2,7 @@
 name = "harness-daily"
 version = "0.1.0"
 edition = "2021"
-description = "Universal plugin for Grok / Claude / Codex: scan local AI coding harness sessions and write a daily report via the current agent CLI."
+description = "Universal plugin for local AI coding harness sessions and daily reports."
 license = "MIT"
 repository = "https://github.com/TardisBooo/harness-daily"
 readme = "README.md"
@@ -20,11 +20,13 @@ dirs = "6"
 dunce = "1"
 glob = "0.3"
 regex = { version = "1", default-features = false, features = ["std", "unicode-perl", "unicode-case"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 urlencoding = "2"
 which = "7"
+zstd = "0.13"
 
 [dev-dependencies]
 tempfile = "3"

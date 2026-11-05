@@ -9,11 +9,13 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, NaiveDate, Utc};
 use chrono_tz::Tz;
 use glob::glob;
+use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::time::Duration as StdDuration;
 
 pub fn collect(cfg: &Config, date: NaiveDate) -> Result<CollectPayload> {
     let tz = parse_tz(&cfg.timezone)?;
@@ -29,6 +31,8 @@ pub fn collect(cfg: &Config, date: NaiveDate) -> Result<CollectPayload> {
             "claude" => acts.extend(collect_claude(&r.path, start, end)),
             "grok" => acts.extend(collect_grok(&r.path, start, end)),
             "pi" | "omp" => acts.extend(collect_pi_like(&r.path, &r.id, start, end)),
+            "dsh" => acts.extend(collect_dsh(&r.path, start, end)),
+            "antigravity" => acts.extend(collect_antigravity(&r.path, start, end)),
             _ => {}
         }
     }
@@ -363,6 +367,360 @@ fn collect_pi_like(
     acts
 }
 
+struct DshSession {
+    id: String,
+    project: String,
+    created_at: Option<DateTime<Utc>>,
+    activity_times: Vec<DateTime<Utc>>,
+    prompts: Vec<(DateTime<Utc>, String)>,
+}
+
+fn collect_dsh(root: &Path, start: DateTime<Utc>, end: DateTime<Utc>) -> Vec<Activity> {
+    let mut acts = Vec::new();
+    let pat = glob_pat(&root.join("sessions"), "**/session*.jsonl*");
+    let Ok(paths) = glob(&pat) else {
+        return acts;
+    };
+
+    // A session directory can retain more than one generation. Prefer the
+    // highest version and compressed storage when both describe one session.
+    let mut selected: HashMap<std::path::PathBuf, (std::path::PathBuf, (u32, bool))> =
+        HashMap::new();
+    for path in paths.flatten() {
+        let Some(parent) = path.parent() else {
+            continue;
+        };
+        let rank = dsh_artifact_rank(&path);
+        let entry = selected
+            .entry(parent.to_path_buf())
+            .or_insert_with(|| (path.clone(), rank));
+        if rank > entry.1 {
+            *entry = (path, rank);
+        }
+    }
+
+    let mut artifacts: Vec<_> = selected.into_values().map(|(path, _)| path).collect();
+    artifacts.sort();
+    let mut seen_sessions = HashSet::new();
+    let mut recent: HashMap<(String, String), DateTime<Utc>> = HashMap::new();
+    for path in artifacts {
+        let Some(session) = read_dsh_file(&path) else {
+            continue;
+        };
+        if !seen_sessions.insert(session.id.clone()) {
+            continue;
+        }
+
+        let session_time = session
+            .activity_times
+            .iter()
+            .copied()
+            .find(|ts| in_day(*ts, start, end))
+            .or_else(|| {
+                session
+                    .prompts
+                    .iter()
+                    .map(|(ts, _)| *ts)
+                    .find(|ts| in_day(*ts, start, end))
+            })
+            .or_else(|| session.created_at.filter(|ts| in_day(*ts, start, end)));
+        if let Some(ts) = session_time {
+            acts.push(Activity {
+                tool: "dsh".into(),
+                project: session.project.clone(),
+                time: ts,
+                text: None,
+                kind: "session".into(),
+            });
+        }
+
+        for (ts, text) in session.prompts {
+            if !in_day(ts, start, end) {
+                continue;
+            }
+            let key = (session.id.clone(), text.clone());
+            if let Some(last) = recent.get(&key) {
+                if ts - *last < Duration::minutes(2) {
+                    continue;
+                }
+            }
+            recent.insert(key, ts);
+            acts.push(Activity {
+                tool: "dsh".into(),
+                project: session.project.clone(),
+                time: ts,
+                text: Some(text),
+                kind: "prompt".into(),
+            });
+        }
+    }
+    acts
+}
+
+fn dsh_artifact_rank(path: &Path) -> (u32, bool) {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default();
+    let version = name
+        .strip_prefix("session.v")
+        .and_then(|rest| rest.split('.').next())
+        .and_then(|raw| raw.parse::<u32>().ok())
+        .unwrap_or(0);
+    (version, name.ends_with(".zstd"))
+}
+
+fn read_dsh_file(path: &Path) -> Option<DshSession> {
+    let fallback_id = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    if path.extension().and_then(|s| s.to_str()) == Some("zstd") {
+        let file = File::open(path).ok()?;
+        let decoder = zstd::stream::read::Decoder::new(file).ok()?;
+        read_dsh_session(BufReader::new(decoder), fallback_id)
+    } else {
+        let file = File::open(path).ok()?;
+        read_dsh_session(BufReader::new(file), fallback_id)
+    }
+}
+
+fn read_dsh_session<R: BufRead>(reader: R, fallback_id: String) -> Option<DshSession> {
+    let mut header: Option<(String, String, Option<DateTime<Utc>>)> = None;
+    let mut activity_times = Vec::new();
+    let mut prompts = Vec::new();
+    for line in reader.lines().map_while(|line| line.ok()) {
+        let Ok(obj) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if json_str(&obj, "type") == Some("session") && header.is_none() {
+            let id = json_str(&obj, "id").unwrap_or(&fallback_id).to_string();
+            let project = json_str(&obj, "cwd")
+                .filter(|cwd| !cwd.trim().is_empty())
+                .unwrap_or("(未知项目)")
+                .to_string();
+            header = Some((id, project, dsh_timestamp(&obj, "createdAt")));
+            continue;
+        }
+        if let Some(ts) = dsh_timestamp(&obj, "time") {
+            activity_times.push(ts);
+        }
+        if json_str(&obj, "type") != Some("user/message") {
+            continue;
+        }
+        let Some(data) = obj.get("data") else {
+            continue;
+        };
+        if json_str(data, "role") != Some("user")
+            || data
+                .get("source")
+                .and_then(|source| json_str(source, "kind"))
+                != Some("user")
+        {
+            continue;
+        }
+        let Some(ts) = dsh_timestamp(&obj, "time") else {
+            continue;
+        };
+        let text = clean_prompt(&content_text(data.get("content")));
+        if worth_keeping(&text) {
+            prompts.push((ts, text));
+        }
+    }
+    let (id, project, created_at) = header?;
+    Some(DshSession {
+        id,
+        project,
+        created_at,
+        activity_times,
+        prompts,
+    })
+}
+
+fn dsh_timestamp(obj: &Value, key: &str) -> Option<DateTime<Utc>> {
+    let value = obj.get(key)?;
+    if let Some(raw) = value.as_i64() {
+        return DateTime::<Utc>::from_timestamp_millis(raw);
+    }
+    if let Some(raw) = value.as_f64() {
+        return DateTime::<Utc>::from_timestamp_millis(raw as i64);
+    }
+    value.as_str().and_then(parse_iso)
+}
+
+fn content_text(content: Option<&Value>) -> String {
+    if let Some(raw) = content.and_then(Value::as_str) {
+        return raw.to_string();
+    }
+    content
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|part| json_str(part, "type") == Some("text"))
+        .filter_map(|part| json_str(part, "text"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn collect_antigravity(root: &Path, start: DateTime<Utc>, end: DateTime<Utc>) -> Vec<Activity> {
+    let mut acts = Vec::new();
+    let pat = glob_pat(
+        &root.join("brain"),
+        "*/.system_generated/logs/transcript*.jsonl",
+    );
+    let Ok(paths) = glob(&pat) else {
+        return acts;
+    };
+
+    // transcript.jsonl is the canonical file. Use transcript_full.jsonl only
+    // when the canonical file is absent, so a conversation is not doubled.
+    let mut selected: HashMap<std::path::PathBuf, (std::path::PathBuf, bool)> = HashMap::new();
+    for path in paths.flatten() {
+        let Some(log_dir) = path.parent() else {
+            continue;
+        };
+        let is_canonical = path.file_name().and_then(|s| s.to_str()) == Some("transcript.jsonl");
+        let entry = selected
+            .entry(log_dir.to_path_buf())
+            .or_insert_with(|| (path.clone(), is_canonical));
+        if is_canonical && !entry.1 {
+            *entry = (path, true);
+        }
+    }
+
+    let workspaces = load_antigravity_workspaces(&root.join("conversation_summaries.db"));
+    let mut logs: Vec<_> = selected.into_values().map(|(path, _)| path).collect();
+    logs.sort();
+    for path in logs {
+        let conversation_id = path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "unknown".into());
+        let project = workspaces
+            .get(&conversation_id)
+            .cloned()
+            .unwrap_or_else(|| "(未定位项目)".into());
+        let mut had_session = false;
+        let mut seen: HashMap<String, DateTime<Utc>> = HashMap::new();
+        for obj in iter_jsonl(&path) {
+            if json_str(&obj, "type") != Some("USER_INPUT")
+                || json_str(&obj, "source") != Some("USER_EXPLICIT")
+            {
+                continue;
+            }
+            let Some(ts) = json_str(&obj, "created_at").and_then(parse_iso) else {
+                continue;
+            };
+            if !in_day(ts, start, end) {
+                continue;
+            }
+            if !had_session {
+                had_session = true;
+                acts.push(Activity {
+                    tool: "antigravity".into(),
+                    project: project.clone(),
+                    time: ts,
+                    text: None,
+                    kind: "session".into(),
+                });
+            }
+            let text = clean_prompt(&antigravity_request(
+                json_str(&obj, "content").unwrap_or(""),
+            ));
+            if !worth_keeping(&text) {
+                continue;
+            }
+            if let Some(last) = seen.get(&text) {
+                if ts - *last < Duration::minutes(2) {
+                    continue;
+                }
+            }
+            seen.insert(text.clone(), ts);
+            acts.push(Activity {
+                tool: "antigravity".into(),
+                project: project.clone(),
+                time: ts,
+                text: Some(text),
+                kind: "prompt".into(),
+            });
+        }
+    }
+    acts
+}
+
+fn antigravity_request(content: &str) -> String {
+    const OPEN: &str = "<USER_REQUEST>";
+    const CLOSE: &str = "</USER_REQUEST>";
+    if let Some(start) = content.find(OPEN) {
+        let rest = &content[start + OPEN.len()..];
+        if let Some(end) = rest.find(CLOSE) {
+            return rest[..end].to_string();
+        }
+    }
+    content.to_string()
+}
+
+fn load_antigravity_workspaces(path: &Path) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+    if !path.exists() {
+        return result;
+    }
+    let Ok(connection) = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) else {
+        return result;
+    };
+    let _ = connection.busy_timeout(StdDuration::from_millis(250));
+    let Ok(mut statement) =
+        connection.prepare("SELECT conversation_id, workspace_uris FROM conversation_summaries")
+    else {
+        return result;
+    };
+    let Ok(rows) = statement.query_map([], |row| {
+        let id: String = row.get(0)?;
+        let raw: Option<String> = row.get(1)?;
+        Ok((id, raw))
+    }) else {
+        return result;
+    };
+    for row in rows.flatten() {
+        let (id, raw) = row;
+        if let Some(path) = raw.as_deref().and_then(antigravity_workspace_path) {
+            result.insert(id, path);
+        }
+    }
+    result
+}
+
+fn antigravity_workspace_path(raw: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(raw).unwrap_or_else(|_| Value::String(raw.into()));
+    let candidates = match value {
+        Value::Array(items) => items
+            .into_iter()
+            .filter_map(|item| item.as_str().map(str::to_string))
+            .collect::<Vec<_>>(),
+        Value::String(item) => vec![item],
+        _ => Vec::new(),
+    };
+    candidates.into_iter().find_map(|uri| {
+        let decoded = urlencoding::decode(&uri).ok()?.into_owned();
+        let path = decoded
+            .strip_prefix("file:///")
+            .or_else(|| decoded.strip_prefix("file://"))?;
+        let path = if cfg!(windows) {
+            path.replace('/', "\\")
+        } else {
+            format!("/{path}")
+        };
+        (!path.trim().is_empty()).then_some(path)
+    })
+}
+
 fn bundle(date: NaiveDate, tz: Tz, acts: Vec<Activity>) -> CollectPayload {
     let mut by_proj: HashMap<String, Vec<Activity>> = HashMap::new();
     let mut notes = Vec::new();
@@ -447,5 +805,208 @@ fn bundle(date: NaiveDate, tz: Tz, acts: Vec<Activity>) -> CollectPayload {
         stats,
         notes,
         audit,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+    use rusqlite::params;
+    use std::io::Write;
+
+    fn test_bounds() -> (DateTime<Utc>, DateTime<Utc>) {
+        (
+            parse_iso("2026-09-12T00:00:00Z").unwrap(),
+            parse_iso("2026-09-13T00:00:00Z").unwrap(),
+        )
+    }
+
+    fn dsh_header(id: &str, cwd: &str) -> String {
+        serde_json::json!({
+            "type": "session",
+            "version": 4,
+            "id": id,
+            "cwd": cwd,
+            "createdAt": 1789171200000_i64,
+            "delegationDepth": 0
+        })
+        .to_string()
+    }
+
+    fn dsh_message(time: i64, source: &str, text: &str) -> String {
+        serde_json::json!({
+            "type": "user/message",
+            "time": time,
+            "data": {
+                "role": "user",
+                "source": { "kind": source },
+                "content": [{ "type": "text", "text": text }]
+            }
+        })
+        .to_string()
+    }
+
+    fn write_zstd_frames(path: &std::path::Path, frames: &[String]) {
+        let mut bytes = Vec::new();
+        for frame in frames {
+            bytes.extend(zstd::stream::encode_all(frame.as_bytes(), 0).unwrap());
+        }
+        std::fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn dsh_reads_concatenated_frames_and_filters_injected_messages() {
+        let root = tempfile::tempdir().unwrap();
+        let session_dir = root.path().join("sessions/project/session-1");
+        std::fs::create_dir_all(&session_dir).unwrap();
+        let path = session_dir.join("session.v4.jsonl.zstd");
+        let first = format!("{}\n", dsh_header("session-1", "E:\\Workspaces\\demo"));
+        let second = format!(
+            "{}\n{}\n{}\n",
+            dsh_message(1789174800000, "runtime-context", "系统注入内容"),
+            dsh_message(1789174800000, "user", "完成 DSH 适配"),
+            dsh_message(1789174860000, "user", "完成 DSH 适配")
+        );
+        write_zstd_frames(
+            &session_dir.join("session.jsonl.zstd"),
+            &[format!(
+                "{}\n{}\n",
+                dsh_header("session-1", "E:\\Workspaces\\demo"),
+                dsh_message(1789174800000, "user", "旧版本内容")
+            )],
+        );
+        write_zstd_frames(&path, &[first, second]);
+
+        let (start, end) = test_bounds();
+        let acts = collect_dsh(root.path(), start, end);
+        assert_eq!(acts.iter().filter(|a| a.kind == "session").count(), 1);
+        let prompts: Vec<_> = acts.iter().filter(|a| a.kind == "prompt").collect();
+        assert_eq!(prompts.len(), 1);
+        assert_eq!(prompts[0].text.as_deref(), Some("完成 DSH 适配"));
+        assert_eq!(prompts[0].project, "E:\\Workspaces\\demo");
+    }
+
+    #[test]
+    fn dsh_reads_raw_logs() {
+        let root = tempfile::tempdir().unwrap();
+        let session_dir = root.path().join("sessions/project/session-raw");
+        std::fs::create_dir_all(&session_dir).unwrap();
+        let path = session_dir.join("session.jsonl");
+        let mut file = std::fs::File::create(path).unwrap();
+        writeln!(file, "{}", dsh_header("session-raw", "E:\\Workspaces\\raw")).unwrap();
+        writeln!(
+            file,
+            "{}",
+            dsh_message(1789178400000, "user", "读取原始日志")
+        )
+        .unwrap();
+
+        let (start, end) = test_bounds();
+        let acts = collect_dsh(root.path(), start, end);
+        assert_eq!(acts.iter().filter(|a| a.kind == "prompt").count(), 1);
+    }
+
+    #[test]
+    fn antigravity_extracts_request_and_workspace() {
+        let root = tempfile::tempdir().unwrap();
+        let id = "conversation-1";
+        let log_dir = root
+            .path()
+            .join("brain")
+            .join(id)
+            .join(".system_generated/logs");
+        std::fs::create_dir_all(&log_dir).unwrap();
+        let transcript = log_dir.join("transcript.jsonl");
+        let mut file = std::fs::File::create(transcript).unwrap();
+        writeln!(
+            file,
+            "{}",
+            serde_json::json!({
+                "type": "USER_INPUT",
+                "source": "USER_EXPLICIT",
+                "created_at": "2026-09-12T08:00:00Z",
+                "content": "<USER_REQUEST>实现 Antigravity 适配</USER_REQUEST><ADDITIONAL_METADATA>ignored</ADDITIONAL_METADATA>"
+            })
+        )
+        .unwrap();
+        writeln!(
+            file,
+            "{}",
+            serde_json::json!({
+                "type": "PLANNER_RESPONSE",
+                "created_at": "2026-09-12T08:01:00Z",
+                "content": "not a user prompt"
+            })
+        )
+        .unwrap();
+
+        let db = root.path().join("conversation_summaries.db");
+        let connection = Connection::open(&db).unwrap();
+        connection
+            .execute(
+                "CREATE TABLE conversation_summaries (conversation_id TEXT, workspace_uris TEXT)",
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO conversation_summaries (conversation_id, workspace_uris) VALUES (?1, ?2)",
+                params![id, r#"["file:///e%3A/Workspaces/antigravity-demo"]"#],
+            )
+            .unwrap();
+        drop(connection);
+
+        let (start, end) = test_bounds();
+        let acts = collect_antigravity(root.path(), start, end);
+        assert_eq!(acts.iter().filter(|a| a.kind == "session").count(), 1);
+        let prompt = acts.iter().find(|a| a.kind == "prompt").unwrap();
+        assert_eq!(prompt.text.as_deref(), Some("实现 Antigravity 适配"));
+        assert!(prompt.project.contains("Workspaces"));
+    }
+
+    #[test]
+    fn antigravity_falls_back_when_workspace_db_is_unavailable() {
+        let root = tempfile::tempdir().unwrap();
+        let log_dir = root
+            .path()
+            .join("brain")
+            .join("conversation-2")
+            .join(".system_generated/logs");
+        std::fs::create_dir_all(&log_dir).unwrap();
+        std::fs::write(
+            log_dir.join("transcript.jsonl"),
+            serde_json::json!({
+                "type": "USER_INPUT",
+                "source": "USER_EXPLICIT",
+                "created_at": "2026-09-12T08:00:00Z",
+                "content": "<USER_REQUEST>使用未知项目继续</USER_REQUEST>"
+            })
+            .to_string()
+                + "\n",
+        )
+        .unwrap();
+
+        let (start, end) = test_bounds();
+        let acts = collect_antigravity(root.path(), start, end);
+        assert_eq!(acts[0].project, "(未定位项目)");
+    }
+
+    #[test]
+    fn bundle_includes_new_tools_in_stats() {
+        let tz = parse_tz("Asia/Shanghai").unwrap();
+        let payload = bundle(
+            NaiveDate::from_ymd_opt(2026, 9, 12).unwrap(),
+            tz,
+            vec![Activity {
+                tool: "dsh".into(),
+                project: "demo".into(),
+                time: parse_iso("2026-09-12T08:00:00Z").unwrap(),
+                text: Some("x".into()),
+                kind: "prompt".into(),
+            }],
+        );
+        assert!(payload.stats.iter().any(|s| s.tool == "dsh"));
+        assert!(payload.stats.iter().any(|s| s.tool == "antigravity"));
     }
 }

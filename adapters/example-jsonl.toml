@@ -1,5 +1,5 @@
 # 复制到 %APPDATA%/harness-daily/adapters/ 以扩展未知 harness。
-# v0.1 采集器尚未加载这些 toml（内置五家足够）；格式作为贡献约定保留。
+# 采集器尚未加载这些 toml（内置适配器足够）；格式作为贡献约定保留。
 
 id = "example"
 label = "Example CLI"
