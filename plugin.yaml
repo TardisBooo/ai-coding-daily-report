@@ -1,6 +1,6 @@
 manifest_version: 1
 name: harness-daily
-version: 0.1.0
-description: Universal plugin for local AI coding harness sessions, including DSH and Antigravity, and daily reports via the current agent CLI.
+version: 0.1.1
+description: Turn local AI coding sessions into a daily work report.
 author: harness-daily contributors
 kind: standalone

@@ -1,19 +1,19 @@
 ---
 name: harness-daily
 description: >
-  通用插件：汇总本机 Codex / Claude Code / Grok Build / Pi / OMP 的会话，生成企业日报 Markdown。
-  可装进 Grok Build、Claude Code、Codex。当用户提到日报、工作日志、harness-daily、每天写日报、汇总昨天的工作时使用。
+  将本机 AI 编码会话汇总为 Markdown 日报。用于用户明确要求收集、预览或生成编码日报。
 argument-hint: "[--date YYYY-MM-DD] [--backfill N]"
 ---
 
-# harness-daily
+# AI 编程日报
 
-这是一套 **Grok / Claude / Codex 通用插件**（同一仓库：`skills/`、`commands/`、`.claude-plugin/`、`plugin.yaml`）。
-采集器是独立 CLI `harness-daily`；写正文使用**当前这套 agent CLI** 的登录态
-（Grok `grok --prompt-file`、Claude `claude -p`、Codex `codex exec`）。不要另配 API key。
+先检查本机 `harness-daily --version`。如果缺少程序，请让用户按
+[校验发布包的安装步骤](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.zh-CN.md#安装二进制) 安装。
+首次配置时，确认写作 CLI 和输出目录，再运行 `harness-daily init --host <已选 CLI> --out "<日报目录>"` 和
+`harness-daily doctor`。已有配置时，只在用户要求修改时重新初始化。
 
-操作系统定时任务会自己调 `harness-daily report`。被定时任务拉起的无头 writer
-（Grok / Claude / Codex）**不要再读本技能、不要改文件、不要调 MCP**，只根据采集 JSON 输出日报 JSON。
+普通报告会把日期、项目名、项目路径和提问片段交给选定的写作 CLI。每个项目最多 12 条，每条最多
+180 字符。该 CLI 可能把这些字段发给已配置的模型服务。用户只要求检查采集结果时，使用 `--dry-collect`。
 
 ## 生成昨天的日报
 
@@ -33,27 +33,13 @@ harness-daily report --date YYYY-MM-DD
 harness-daily report --date YYYY-MM-DD --dry-collect
 ```
 
-## 安装与定时
+## 定时生成
 
-Marketplace（推荐，与 agent-triforce 相同）：
-
-```
-/plugin marketplace add TardisBooo/harness-daily
-/plugin install harness-daily@harness-daily
-/harness-daily:setup
-```
-
-Grok 在 add marketplace 之后用 `/plugin install harness-daily --trust`。
-
-已经有二进制时：
+仅当用户要求自动生成日报时，再登记定时任务：
 
 ```bash
-harness-daily init --host auto --out "D:/Me/工作日志"
-harness-daily doctor
 harness-daily schedule install --time 08:00
 ```
-
-`--host auto` 按 grok → claude → codex 探测已安装的 CLI。也可显式 `--host grok|claude|codex`。
 
 ## 规则
 

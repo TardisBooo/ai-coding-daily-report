@@ -1,18 +1,18 @@
 <div align="center">
 
-# harness-daily
+# AI Coding Daily Report
 
-**One command turns yesterday's AI coding sessions into an enterprise-style daily report — written by whichever agent CLI you already use.**
+**Turn local AI coding sessions into a Markdown daily report with Grok Build, Claude Code, or Codex.**
 
-_Universal plugin · Scan locally · Write with Grok / Claude / Codex · Marketplace install · No extra API keys_
+_Use the `harness-daily` CLI or install its agent plugin._
 
-[![CI](https://github.com/TardisBooo/harness-daily/actions/workflows/ci.yml/badge.svg)](https://github.com/TardisBooo/harness-daily/actions/workflows/ci.yml)
-[![Release](https://github.com/TardisBooo/harness-daily/actions/workflows/release.yml/badge.svg)](https://github.com/TardisBooo/harness-daily/actions/workflows/release.yml)
+[![CI](https://github.com/TardisBooo/ai-coding-daily-report/actions/workflows/ci.yml/badge.svg)](https://github.com/TardisBooo/ai-coding-daily-report/actions/workflows/ci.yml)
+[![Release](https://github.com/TardisBooo/ai-coding-daily-report/actions/workflows/release.yml/badge.svg)](https://github.com/TardisBooo/ai-coding-daily-report/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-32CD32.svg)](LICENSE)
-![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)
+![Rust](https://img.shields.io/badge/rust-stable-orange)
 ![Platforms](https://img.shields.io/badge/platform-windows%20%7C%20macos%20%7C%20linux-blue)
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/README.zh-CN.md)
 
 </div>
 
@@ -24,7 +24,7 @@ _Universal plugin · Scan locally · Write with Grok / Claude / Codex · Marketp
 [How it works](#-how-it-works) ·
 [Requirements](#-requirements) ·
 [Install](#-install) ·
-[Install tutorial](docs/install.md) ·
+[Install tutorial](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.md) ·
 [Quick start](#-quick-start) ·
 [Commands](#-commands) ·
 [Configuration](#-configuration) ·
@@ -44,10 +44,11 @@ digging through histories by hand.
 
 harness-daily does it for you:
 
-- **Universal plugin** — one GitHub repo installs into **Grok Build**, **Claude Code**, or
-  **Codex**. Same skills, same slash commands, same binary.
-- **Scans every harness locally** — reads session/prompt logs from disk; nothing leaves your machine
-  except the distilled prompts you choose to send to **your own** Grok / Claude / Codex CLI.
+- **Shared CLI and skill**. The plugin runs with Grok Build, Claude Code, or Codex.
+- **Local collection**. The CLI reads supported session logs from disk. Report
+  generation passes the report date, project names and paths, and up to 12 prompt
+  excerpts of up to 180 characters per project to your selected writer CLI. The
+  writer may send them to its configured model provider.
 - **Writes the prose with your current agent CLI** — Grok Build, Claude Code, or Codex, using
   the login you already have. No second API key. `init --host auto` picks the first one found.
 - **Enterprise-report format** — "today's work" grouped by project with merged work items; raw
@@ -60,7 +61,7 @@ harness-daily does it for you:
    ├─ discover roots  (codex / claude / grok / pi / omp / dsh / antigravity)
    ├─ collect         (parse JSONL, dedupe, drop "continue"/"ok"/smoke-test noise)
    ├─ write            grok --prompt-file / claude -p / codex exec  (your login, your default model)
-   └─ render          D:/Me/工作日志/日报-YYYY-MM-DD.md   ← summary · details · issues · stats · audit log
+   └─ render          ~/work-logs/日报-YYYY-MM-DD.md   ← summary · details · issues · stats · audit log
 ```
 
 ## 🧭 How it works
@@ -84,85 +85,57 @@ Supported out of the box: **Codex CLI** (`~/.codex`), **Claude Code** (`~/.claud
 
 ## 📦 Install
 
-This is a **universal plugin**. Recommended path is the **plugin marketplace** (same idea as
-[agent-triforce](https://github.com/ArtemioPadilla/agent-triforce)): add the GitHub repo as a
-source, install the plugin in whichever harness you use, then run setup. Setup downloads the
-native binary, writes config, and registers the 08:00 OS task. Step-by-step:
-[docs/install.md](docs/install.md) · [中文安装教程](docs/install.zh-CN.md).
+Install the binary from a versioned release and verify its SHA-256 digest. Add the
+plugin in your host when you want to invoke the CLI from a session.
+Follow the [installation guide](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.md) · [简体中文](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.zh-CN.md).
 
 ### Claude Code
 
-```
-/plugin marketplace add TardisBooo/harness-daily
+```text
+/plugin marketplace add TardisBooo/ai-coding-daily-report
 /plugin install harness-daily@harness-daily
 /harness-daily:setup
 ```
 
 ### Grok Build
 
-```
-/plugin marketplace add TardisBooo/harness-daily
-/plugin install harness-daily --trust
-/harness-daily:setup
-```
-
-From a shell (equivalent):
-
 ```sh
-grok plugin marketplace add TardisBooo/harness-daily
-grok plugin install harness-daily --trust
+grok plugin install TardisBooo/ai-coding-daily-report@v0.1.1
 ```
 
 ### Codex CLI
 
 ```sh
-codex plugin install TardisBooo/harness-daily
+codex plugin marketplace add TardisBooo/ai-coding-daily-report
+codex plugin add harness-daily@harness-daily
 ```
 
-Then run `/harness-daily:setup` in the session, or from a shell:
+### Binary only
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.sh | bash
-# Windows: irm https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.ps1 | iex
-harness-daily init --host auto
-harness-daily schedule install --time 08:00
-```
-
-The plugin only adds skills/commands. Daily reports are produced by the **binary + OS scheduler**,
-not by an open chat window.
-
-### Binary only (no plugin)
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.sh | bash
-irm https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.ps1 | iex   # Windows
-cargo install --git https://github.com/TardisBooo/harness-daily
-```
+You can follow the [binary installation](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.md#install-the-binary) and
+initialize the CLI without a plugin.
 
 ## 🚀 Quick start
 
-After marketplace install, `/harness-daily:setup` is enough. From a shell:
-
 ```sh
-harness-daily init --host auto --out "D:/Me/工作日志"   # grok → claude → codex
+harness-daily init --host codex --out "<reports-folder>"
 harness-daily doctor
-harness-daily report
-harness-daily schedule install --time 08:00
+harness-daily report --dry-collect
 ```
 
-Force a writer:
-
-```sh
-harness-daily init --host grok
-harness-daily init --host claude
-harness-daily init --host codex
-```
-
-Generate a specific day or catch up a week:
+Set `--host grok` or `--host claude` to use another installed writer. Run
+`harness-daily report` after reviewing the collected prompts. Generate a
+specific day or catch up a week:
 
 ```sh
 harness-daily report --date 2026-09-16
 harness-daily report --backfill 7 --auto
+```
+
+When you want automatic reports, enable the OS task explicitly:
+
+```sh
+harness-daily schedule install --time 08:00
 ```
 
 ## 🎛 Commands
@@ -181,11 +154,11 @@ JSON (no model call) for debugging.
 
 ## ⚙️ Configuration
 
-`%APPDATA%/harness-daily/config.toml` (Windows) · `~/.config/harness-daily/config.toml` (macOS/Linux)
+See [configuration paths](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/docs/install.md#uninstall) for your OS.
 
 ```toml
 timezone    = "Asia/Shanghai"
-output_dir  = 'D:\Me\工作日志'
+output_dir  = '/path/to/work-logs'
 report_time = "08:00"
 backfill_days = 7
 extra_roots = []            # extra scan roots (moved data dirs)
@@ -224,12 +197,12 @@ data_dir = ""               # override if you moved ~/.gemini/antigravity
 
 ## 🧩 Extending
 
-- **New harness / desktop app**: copy [`adapters/example-jsonl.toml`](adapters/example-jsonl.toml)
+- **New harness / desktop app**: copy [`adapters/example-jsonl.toml`](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/adapters/example-jsonl.toml)
   into your config dir and edit the paths/keys. Built-in Rust adapters live in `src/collect.rs`;
-  PRs welcome (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+  PRs welcome (see [`CONTRIBUTING.md`](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/CONTRIBUTING.md)).
 - **Writer CLI**: `--host grok|claude|codex|auto`. Collection covers all seven built-in sources.
-- **Privacy**: everything is local. Only the per-project prompt digest is passed to your own
-  writer CLI (`grok --prompt-file` / `claude -p` / `codex exec`); the audit appendix can be disabled.
+- **Privacy**. `report --dry-collect` writes the collection locally without
+  invoking a writer. The optional audit appendix includes original prompts.
 
 ## 🛠 Development
 
@@ -248,7 +221,7 @@ Codex headless invocation + strict-JSON recovery) · `src/render.rs` (Markdown a
 ## 🤝 Contributing
 
 Bug reports and new-harness adapters are very welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see [SECURITY.md](SECURITY.md).
+[CONTRIBUTING.md](https://github.com/TardisBooo/ai-coding-daily-report/blob/main/CONTRIBUTING.md). For security issues, see [SECURITY.md](SECURITY.md).
 
 ## 📜 License
 

@@ -6,7 +6,7 @@ Only the latest `main` and the most recent release tag receive security fixes.
 
 ## Reporting a vulnerability
 
-Please use [GitHub security advisories](https://github.com/TardisBooo/harness-daily/security/advisories/new)
+Please use [GitHub security advisories](https://github.com/TardisBooo/ai-coding-daily-report/security/advisories/new)
 ("Report a vulnerability"). Do not open public issues for security problems.
 
 Include: affected version, OS, steps to reproduce, and impact. You will get an acknowledgment

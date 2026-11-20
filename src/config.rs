@@ -101,7 +101,16 @@ fn default_true() -> bool {
 }
 
 impl Config {
+    pub fn home_override() -> Option<PathBuf> {
+        std::env::var_os("HARNESS_DAILY_HOME")
+            .filter(|path| !path.is_empty())
+            .map(PathBuf::from)
+    }
+
     pub fn config_path() -> PathBuf {
+        if let Some(home) = Self::home_override() {
+            return home.join("config.toml");
+        }
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join("harness-daily")
@@ -174,13 +183,9 @@ impl Config {
 }
 
 pub fn default_output_dir() -> PathBuf {
-    if cfg!(windows) {
-        PathBuf::from(r"D:\Me\工作日志")
-    } else {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("work-logs")
-    }
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("work-logs")
 }
 
 pub fn ensure_dir(p: &Path) -> Result<()> {

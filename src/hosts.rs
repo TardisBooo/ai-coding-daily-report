@@ -102,7 +102,6 @@ fn find_grok() -> Option<PathBuf> {
     let candidates = [
         home.join(".grok").join("bin").join("grok.exe"),
         home.join(".grok").join("bin").join("grok"),
-        PathBuf::from(r"D:\SOFTWARE\OpenAgents\bin\grok.exe"),
     ];
     if let Some(p) = candidates.into_iter().find(|p| p.exists()) {
         return Some(p);
@@ -152,12 +151,4 @@ fn usable_bin_path(p: &Path, skip_cmd: bool) -> bool {
         return false;
     }
     p.exists()
-}
-
-pub fn default_extra_args(host: Host) -> Vec<String> {
-    match host {
-        Host::Grok => vec!["--always-approve".into()],
-        Host::Claude => vec!["--dangerously-skip-permissions".into()],
-        Host::Codex => vec![],
-    }
 }

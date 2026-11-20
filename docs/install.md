@@ -1,120 +1,106 @@
-# Install harness-daily
+# Install AI Coding Daily Report
 
-harness-daily is a **universal plugin** for Grok Build, Claude Code, and Codex. Same GitHub repo,
-same skills/commands, same binary.
-
-This is the same marketplace flow as
-[agent-triforce](https://github.com/ArtemioPadilla/agent-triforce): add the GitHub repo as a
-plugin source, install the plugin in the harness you use, then run setup.
-
-The plugin ships skills and slash commands. The collector is a **native binary**. `/harness-daily:setup`
-downloads that binary, writes config, and registers a daily OS task. Reports do **not** require an
-open chat window after setup.
+Install the `harness-daily` binary. If you use an agent in a terminal, you can also
+install its plugin to call the same CLI from a session.
 
 [简体中文](install.zh-CN.md)
 
-## Prerequisites
+## Install the binary
 
-- Windows, macOS, or Linux
-- At least one logged-in CLI: [Grok Build](https://x.ai/cli), [Claude Code](https://docs.anthropic.com/en/docs/claude-code), or [Codex CLI](https://github.com/openai/codex)
+Open the [v0.1.1 release](https://github.com/TardisBooo/ai-coding-daily-report/releases/tag/v0.1.1). Download the ZIP for your platform.
 
-## Claude Code
+| Platform | ZIP suffix |
+|---|---|
+| Windows x64 | `x86_64-pc-windows-msvc` |
+| macOS Apple silicon | `aarch64-apple-darwin` |
+| macOS Intel | `x86_64-apple-darwin` |
+| Linux x64 with glibc | `x86_64-unknown-linux-gnu` |
+| Linux x64 with musl | `x86_64-unknown-linux-musl` |
 
-In a Claude Code session:
+Find the downloaded file's `digest` under `assets` in the [v0.1.1 release metadata](https://api.github.com/repos/TardisBooo/ai-coding-daily-report/releases/tags/v0.1.1).
+Compare its SHA-256 with the file hash before extracting:
 
-```
-/plugin marketplace add TardisBooo/harness-daily
+- Windows PowerShell: `Get-FileHash -Algorithm SHA256 -LiteralPath "<downloaded ZIP>"`
+- macOS: `shasum -a 256 "<downloaded ZIP>"`
+- Linux: `sha256sum "<downloaded ZIP>"`
+
+When the hash matches, extract the ZIP and place `harness-daily.exe` or `harness-daily`
+in a directory on your PATH. Check it with `harness-daily --version`. If you build from
+source, use a checkout at the [release tag](https://github.com/TardisBooo/ai-coding-daily-report/tree/v0.1.1)
+and run `cargo install --locked --path .`.
+
+## Install a plugin
+
+### Claude Code
+
+```text
+/plugin marketplace add TardisBooo/ai-coding-daily-report
 /plugin install harness-daily@harness-daily
 /harness-daily:setup
 ```
 
-`plugin@marketplace` is Claude's namespaced install (`harness-daily` plugin from the
-`harness-daily` marketplace). Setup will ask for an output directory (where `日报-YYYY-MM-DD.md`
-is written) and then:
-
-1. Download `harness-daily` from GitHub Releases
-2. `harness-daily init --host auto` (or `--host claude` if you want Claude to write the body)
-3. `harness-daily schedule install --time 08:00`
-4. Optionally `harness-daily report` for yesterday
-
-## Grok Build
-
-In a Grok session, or from a shell:
-
-```
-/plugin marketplace add TardisBooo/harness-daily
-/plugin install harness-daily --trust
-/harness-daily:setup
-```
+### Grok Build
 
 ```sh
-grok plugin marketplace add TardisBooo/harness-daily
-grok plugin install harness-daily --trust
+grok plugin install TardisBooo/ai-coding-daily-report@v0.1.1
 ```
 
-`--trust` is required so Grok loads skills/commands. Grok's install flag is the plugin name after
-the marketplace is added (`harness-daily`), not `name@marketplace`.
+Review the plugin and confirm trust in Grok Build. Then run `/harness-daily:setup`.
 
-## Codex CLI
-
-Codex does not use Claude's `/plugin marketplace add owner/repo` string. Install from git/local if
-your Codex build supports it:
+### Codex CLI
 
 ```sh
-codex plugin install TardisBooo/harness-daily
+codex plugin marketplace add TardisBooo/ai-coding-daily-report
+codex plugin add harness-daily@harness-daily
 ```
 
-Then `/harness-daily:setup`, or install the binary yourself (next section) and
-`harness-daily init --host codex`.
+Use the CLI initialization below. In a Codex session, the `$harness-daily:harness-daily` skill
+invokes the same report tool.
 
-## Binary only
+## Preview your first report
 
-No `gh` CLI required:
-
-```sh
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.sh | bash
-
-# Windows PowerShell
-irm https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.ps1 | iex
-```
-
-Then:
+Choose the installed, signed-in writer CLI you want to use. Pass `grok`, `claude`,
+or `codex` to `--host`.
 
 ```sh
-harness-daily init --host auto --out "<logs-dir>"
+harness-daily init --host codex --out "<reports-folder>"
 harness-daily doctor
-harness-daily report                 # yesterday
-harness-daily schedule install --time 08:00
+harness-daily report --dry-collect
 ```
 
-`--host auto` tries grok, then claude, then codex.
+Use `harness-daily scan` to review the session roots. To limit collection, set
+`enabled = false` for unwanted sources under `[harnesses.<id>]` in the config.
+Set `data_dir` there to use a moved source. Codex discovery checks `CODEX_HOME`.
 
-## What you should see
+The preview writes a collection file. An ordinary `harness-daily report` asks the
+writer to generate yesterday's Markdown. It sends the report date, project names
+and paths, and up to 12 prompt excerpts of up to 180 characters per project to
+your selected writer CLI. The writer CLI may send these fields to its configured
+model provider. Review the preview before prompting the writer if your work may
+contain sensitive material.
 
-| Check | Command / place |
-|---|---|
-| Plugin listed | Claude/Grok plugin list shows `harness-daily` |
-| Slash commands | `/harness-daily:setup`, `/harness-daily:harness-daily` |
-| Binary | `harness-daily --version` |
-| Config | Windows `%APPDATA%\harness-daily\config.toml` · macOS/Linux `~/.config/harness-daily/config.toml` |
-| Schedule | Windows task `harness-daily` · macOS `io.github.harness-daily` · Linux crontab line |
-| Output | `<out>/日报-YYYY-MM-DD.md` |
+## Enable or remove daily scheduling
+
+After reviewing the report and sources, enable an OS task if you want automatic
+reports:
+
+```sh
+harness-daily schedule install --time 08:00
+harness-daily schedule status
+```
+
+On Linux, follow the printed cron instructions. `harness-daily schedule remove`
+removes a registered task or prints how to remove the cron line.
 
 ## Uninstall
 
-```sh
-harness-daily schedule remove
-# Claude: /plugin uninstall harness-daily@harness-daily
-# Grok:   grok plugin uninstall harness-daily
-```
+If you enabled scheduling, remove it before removing the binary. Uninstall
+`harness-daily@harness-daily` using your host's plugin UI or CLI. Remove the
+binary from your PATH directory and its installed copy if you ran `init`.
+You can keep the report folder.
 
-Delete the binary directory (`%LOCALAPPDATA%\harness-daily` or `~/.local/bin/harness-daily`) and
-the config directory if you want a clean slate. Report Markdown files are not deleted.
-
-## Troubleshooting
-
-- **`plugin not found` after marketplace add** — run marketplace update / start a new session. Confirm you used `TardisBooo/harness-daily` (GitHub `owner/repo`).
-- **`harness-daily` not on PATH** — Windows: open a new terminal after install.ps1. Or call `%LOCALAPPDATA%\harness-daily\harness-daily.exe` directly.
-- **Writer not found** — install and log into grok, claude, or codex, then `init --host auto` again.
-- **Schedule missed 08:00** — the task runs `report --auto --backfill 7` and fills gaps on the next run.
+The config is in `%APPDATA%/harness-daily` on Windows,
+`~/Library/Application Support/harness-daily` on macOS, and
+`${XDG_CONFIG_HOME:-$HOME/.config}/harness-daily` on Linux. To isolate an
+interactive run, set `HARNESS_DAILY_HOME` to the directory for its config and
+initialized copy of the binary.

@@ -1,10 +1,10 @@
 [package]
 name = "harness-daily"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-description = "Universal plugin for local AI coding harness sessions and daily reports."
+description = "Turn local AI coding sessions into a daily work report."
 license = "MIT"
-repository = "https://github.com/TardisBooo/harness-daily"
+repository = "https://github.com/TardisBooo/ai-coding-daily-report"
 readme = "README.md"
 
 [[bin]]

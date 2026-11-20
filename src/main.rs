@@ -113,18 +113,16 @@ fn run() -> Result<()> {
 }
 
 fn cmd_init(host: &str, out: Option<PathBuf>, time: &str) -> Result<()> {
-    let output_dir = out.unwrap_or_else(config::default_output_dir);
-    ensure_dir(&output_dir)?;
-    let mut cfg = Config::load_or_default(output_dir.clone());
-    cfg.output_dir = output_dir;
+    let mut cfg = Config::load_or_default(config::default_output_dir());
+    if let Some(output_dir) = out {
+        cfg.output_dir = output_dir;
+    }
+    ensure_dir(&cfg.output_dir)?;
     cfg.report_time = time.to_string();
     cfg.writer.host = host.to_string();
     let (resolved, bin) = hosts::resolve_host(&cfg)?;
     cfg.writer.host = resolved.id().into();
     cfg.writer.bin = bin.display().to_string();
-    if cfg.writer.args_extra.is_empty() {
-        cfg.writer.args_extra = hosts::default_extra_args(resolved);
-    }
     if let Ok(installed) = install_self() {
         println!("已安装二进制 {}", installed.display());
     }
@@ -138,9 +136,11 @@ fn cmd_init(host: &str, out: Option<PathBuf>, time: &str) -> Result<()> {
 
 fn install_self() -> Result<PathBuf> {
     let src = std::env::current_exe()?;
-    let dest_dir = dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("harness-daily");
+    let dest_dir = Config::home_override().unwrap_or_else(|| {
+        dirs::data_local_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("harness-daily")
+    });
     fs::create_dir_all(&dest_dir)?;
     let dest = dest_dir.join(if cfg!(windows) {
         "harness-daily.exe"

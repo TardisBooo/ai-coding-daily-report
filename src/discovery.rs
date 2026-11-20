@@ -15,11 +15,13 @@ pub fn builtin_candidates(id: &str) -> Vec<PathBuf> {
             home.join(".gemini").join("antigravity-cli"),
         ];
     }
-    let mut v = vec![home.join(format!(".{id}"))];
-    if id == "codex" && cfg!(windows) {
-        v.push(PathBuf::from(r"D:\SOFTWARE_DATA\Codex\Home"));
+    let default = home.join(format!(".{id}"));
+    if id == "codex" {
+        if let Some(path) = std::env::var_os("CODEX_HOME").filter(|path| !path.is_empty()) {
+            return vec![PathBuf::from(path), default];
+        }
     }
-    v
+    vec![default]
 }
 
 pub fn detect_root(id: &str, cfg: &Config) -> Option<PathBuf> {

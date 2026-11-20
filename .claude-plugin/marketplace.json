@@ -1,20 +1,20 @@
 {
   "name": "harness-daily",
-  "displayName": "harness-daily",
-  "description": "Daily work reports from local AI coding harness sessions",
-  "version": "0.1.0",
+  "displayName": "AI Coding Daily Report",
+  "description": "Daily work reports from local AI coding sessions",
+  "version": "0.1.1",
   "owner": { "name": "TardisBooo", "email": "TardisBooo@users.noreply.github.com" },
-  "homepage": "https://github.com/TardisBooo/harness-daily",
-  "repository": "https://github.com/TardisBooo/harness-daily",
+  "homepage": "https://github.com/TardisBooo/ai-coding-daily-report",
+  "repository": "https://github.com/TardisBooo/ai-coding-daily-report",
   "license": "MIT",
   "plugins": [
     {
       "name": "harness-daily",
       "description": "Universal plugin: scan Codex / Claude / Grok / Pi / OMP sessions and write a daily report via the current agent CLI",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "author": { "name": "TardisBooo" },
       "category": "productivity",
-      "homepage": "https://github.com/TardisBooo/harness-daily",
+      "homepage": "https://github.com/TardisBooo/ai-coding-daily-report",
       "keywords": ["daily-report", "universal-plugin", "codex", "claude", "grok", "pi", "omp"],
       "source": "./"
     }

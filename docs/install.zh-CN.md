@@ -1,109 +1,91 @@
-# 安装 harness-daily
+# 安装 AI 编程日报
 
-harness-daily 是 **Grok Build / Claude Code / Codex 通用插件**：同一个 GitHub 仓库、同一套 skill/命令、同一份二进制。
-
-安装方式和 [agent-triforce](https://github.com/ArtemioPadilla/agent-triforce) 一样：把 GitHub 仓库加成 plugin marketplace，在你正在用的那套 harness 里安装插件，再跑 setup。
-
-插件只提供 skill / 斜杠命令。采集器是 **本机二进制**。`/harness-daily:setup` 负责下载二进制、写配置、登记每天 08:00 的系统任务。装完之后出报 **不依赖** 聊天窗口开着。
+先安装 `harness-daily` 二进制。你也可以在常用的编码工具里安装插件，从会话中调用同一个 CLI。
 
 [English](install.md)
 
-## 环境
+## 安装二进制
 
-- Windows / macOS / Linux
-- 至少登录以下之一：[Grok Build](https://x.ai/cli)、[Claude Code](https://docs.anthropic.com/en/docs/claude-code)、[Codex CLI](https://github.com/openai/codex)
+打开 [v0.1.1 发布页](https://github.com/TardisBooo/ai-coding-daily-report/releases/tag/v0.1.1)，选择平台对应的 ZIP。
 
-## Claude Code
+| 平台 | ZIP 文件后缀 |
+|---|---|
+| Windows x64 | `x86_64-pc-windows-msvc` |
+| macOS Apple 芯片 | `aarch64-apple-darwin` |
+| macOS Intel | `x86_64-apple-darwin` |
+| Linux x64，glibc | `x86_64-unknown-linux-gnu` |
+| Linux x64，musl | `x86_64-unknown-linux-musl` |
 
-在 Claude Code 会话里：
+打开 [v0.1.1 发布元数据](https://api.github.com/repos/TardisBooo/ai-coding-daily-report/releases/tags/v0.1.1)，
+在 `assets` 中找到对应文件的 `digest`。用以下命令计算 ZIP 的 SHA-256，核对一致后再解压。
 
-```
-/plugin marketplace add TardisBooo/harness-daily
+- Windows PowerShell 使用 `Get-FileHash -Algorithm SHA256 -LiteralPath "<下载的 ZIP>"`。
+- macOS 使用 `shasum -a 256 "<下载的 ZIP>"`。
+- Linux 使用 `sha256sum "<下载的 ZIP>"`。
+
+把解压出的 `harness-daily.exe` 或 `harness-daily` 放到 PATH 下的目录，再运行
+`harness-daily --version`。如果从源码安装，请检出 [发布标签](https://github.com/TardisBooo/ai-coding-daily-report/tree/v0.1.1) 后运行 `cargo install --locked --path .`。
+
+## 安装插件
+
+### Claude Code
+
+```text
+/plugin marketplace add TardisBooo/ai-coding-daily-report
 /plugin install harness-daily@harness-daily
 /harness-daily:setup
 ```
 
-`插件名@市场名` 是 Claude 的安装写法（市场 `harness-daily` 里的插件 `harness-daily`）。setup 会询问日报输出目录（`日报-YYYY-MM-DD.md` 的位置），然后：
-
-1. 从 GitHub Releases 下载 `harness-daily`
-2. `harness-daily init --host auto`（若希望用 Claude 写正文，可用 `--host claude`）
-3. `harness-daily schedule install --time 08:00`
-4. 可选：立刻 `harness-daily report` 生成昨天的日报
-
-## Grok Build
-
-在 Grok 会话或终端：
-
-```
-/plugin marketplace add TardisBooo/harness-daily
-/plugin install harness-daily --trust
-/harness-daily:setup
-```
+### Grok Build
 
 ```sh
-grok plugin marketplace add TardisBooo/harness-daily
-grok plugin install harness-daily --trust
+grok plugin install TardisBooo/ai-coding-daily-report@v0.1.1
 ```
 
-`--trust` 之后 skill / 命令才会加载。Grok 在加过 marketplace 之后用 **插件名** 安装（`harness-daily`），不是 Claude 那种 `name@marketplace`。
+在 Grok Build 审阅插件并确认信任，再运行 `/harness-daily:setup`。
 
-## Codex CLI
-
-Codex **没有** Claude 那条 `/plugin marketplace add owner/repo`。若你的 Codex 支持 git/本地源：
+### Codex CLI
 
 ```sh
-codex plugin install TardisBooo/harness-daily
+codex plugin marketplace add TardisBooo/ai-coding-daily-report
+codex plugin add harness-daily@harness-daily
 ```
 
-然后 `/harness-daily:setup`，或按下节只装二进制再 `harness-daily init --host codex`。
+接着在终端初始化。在 Codex 会话中，用 `$harness-daily:harness-daily` 技能调用同一个工具。
 
-## 只要二进制
+## 预览第一份日报
 
-不需要安装 GitHub CLI（`gh`）：
-
-```sh
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.sh | bash
-
-# Windows PowerShell
-irm https://raw.githubusercontent.com/TardisBooo/harness-daily/main/install.ps1 | iex
-```
-
-然后：
+选择已登录的写作 CLI。`--host` 可填 `grok`、`claude` 或 `codex`。
 
 ```sh
-harness-daily init --host auto --out "<日志目录>"
+harness-daily init --host codex --out "<日报目录>"
 harness-daily doctor
-harness-daily report                 # 昨天
-harness-daily schedule install --time 08:00
+harness-daily report --dry-collect
 ```
 
-`--host auto` 探测顺序：grok → claude → codex。
+用 `harness-daily scan` 确认会话目录。只希望采集部分来源时，在配置的 `[harnesses.<id>]`
+中把其余来源的 `enabled` 设为 `false`，或用 `data_dir` 指向迁移后的目录。Codex 支持按 `CODEX_HOME` 查找。
 
-## 装好后应能看到
+预览只在本地写采集文件。运行 `harness-daily report` 才生成昨天的 Markdown 日报。该命令会把
+日期、项目名、项目路径和提问片段交给选定的 CLI。每个项目最多 12 条，每条最多 180 字符。
+该 CLI 可能把这些字段发给已配置的模型服务。会话里可能包含敏感数据时，先检查预览。
 
-| 检查项 | 位置 |
-|---|---|
-| 插件已列出 | Claude / Grok 的 plugin list 有 `harness-daily` |
-| 斜杠命令 | `/harness-daily:setup`、`/harness-daily:harness-daily` |
-| 二进制 | `harness-daily --version` |
-| 配置 | Windows `%APPDATA%\harness-daily\config.toml` · macOS/Linux `~/.config/harness-daily/config.toml` |
-| 定时 | Windows 任务 `harness-daily` · macOS `io.github.harness-daily` · Linux crontab |
-| 输出 | `<out>/日报-YYYY-MM-DD.md` |
+## 启用或移除日报定时任务
+
+确认日报和来源后，如需自动生成，再执行：
+
+```sh
+harness-daily schedule install --time 08:00
+harness-daily schedule status
+```
+
+Linux 按输出配置 cron。`harness-daily schedule remove` 移除已注册的任务，或提示如何移除 cron 条目。
 
 ## 卸载
 
-```sh
-harness-daily schedule remove
-# Claude: /plugin uninstall harness-daily@harness-daily
-# Grok:   grok plugin uninstall harness-daily
-```
+如果已启动定时任务，先移除任务。然后在宿主里卸载 `harness-daily@harness-daily`，
+删除 PATH 中的二进制以及 `init` 创建的副本。日报文件可以留在原目录。
 
-二进制目录（`%LOCALAPPDATA%\harness-daily` 或 `~/.local/bin/harness-daily`）和配置目录可自行删除。已生成的日报 Markdown 不会被删。
-
-## 排障
-
-- **marketplace add 之后找不到插件** — 刷新 marketplace / 开新会话。确认仓库是 `TardisBooo/harness-daily`。
-- **PATH 里没有 harness-daily** — Windows 跑完 install.ps1 后开一个新终端；或直接用 `%LOCALAPPDATA%\harness-daily\harness-daily.exe`。
-- **找不到 writer** — 先登录 grok / claude / codex，再 `init --host auto`。
-- **错过 08:00** — 任务带 `--auto --backfill 7`，下次运行会补最近 7 天缺的日报。
+Windows 配置在 `%APPDATA%/harness-daily`，macOS 配置在 `~/Library/Application Support/harness-daily`，
+Linux 配置在 `${XDG_CONFIG_HOME:-$HOME/.config}/harness-daily`。隔离运行时，可用
+`HARNESS_DAILY_HOME` 指定配置与初始化二进制副本的目录。

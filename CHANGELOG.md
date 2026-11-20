@@ -4,18 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.1.1]
 
 ### Added
 
 - Built-in DSH and Antigravity session collectors.
 - DSH zstd JSONL discovery and Antigravity transcript workspace mapping.
+- Native Codex plugin marketplace metadata.
 
 ### Changed
 
 - Documented as a **universal plugin** for Grok Build, Claude Code, and Codex (same repo,
   same skills/commands). GitHub About, crate description, CLI `--help`, and report footer
   no longer say the body is written only by Grok Build CLI.
+- AI Coding Daily Report is the repository's display name. Plugin and CLI IDs stay `harness-daily`.
+- Setup uses an installed, verified binary. Scheduling is a separate action.
 
 ### Fixed
 
@@ -29,12 +32,8 @@ All notable changes to this project are documented here. The format follows
 
 - Universal writer hosts: `--host auto|grok|claude|codex` (`grok --prompt-file`,
   `claude -p`, `codex exec` on stdin).
-- Plugin manifests for Claude Code (`.claude-plugin/`) and Codex (`plugin.yaml`)
-  in the same repository as the Grok plugin.
-- Marketplace install: `/plugin marketplace add TardisBooo/harness-daily` then
-  `/plugin install harness-daily@harness-daily` (Claude) or
-  `/plugin install harness-daily --trust` (Grok), plus `/harness-daily:setup`.
-- Install scripts no longer require the GitHub CLI (`gh`).
+- Plugin manifests for Claude Code and Codex in the same repository as the Grok plugin.
+- Marketplace install and local setup for the Grok and Claude plugins.
 
 ## [0.1.0] — 2026-09-17
 
@@ -55,4 +54,5 @@ All notable changes to this project are documented here. The format follows
 - CI (fmt + clippy + test on Windows/macOS/Linux) and release workflow with
   per-platform binaries + install scripts.
 
-[0.1.0]: https://github.com/TardisBooo/harness-daily/releases/tag/v0.1.0
+[0.1.1]: https://github.com/TardisBooo/ai-coding-daily-report/releases/tag/v0.1.1
+[0.1.0]: https://github.com/TardisBooo/ai-coding-daily-report/releases/tag/v0.1.0
